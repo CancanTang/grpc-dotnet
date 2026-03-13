@@ -16,10 +16,9 @@
 
 #endregion
 
-using System.CommandLine;
+using System.CommandLine.IO;
 using System.CommandLine.Parsing;
 using Grpc.Dotnet.Cli.Commands;
-using Grpc.Dotnet.Cli.Internal;
 using Grpc.Dotnet.Cli.Options;
 using Microsoft.Build.Evaluation;
 using NUnit.Framework;
@@ -36,17 +35,16 @@ public class AddFileCommandTests : TestBase
         // Arrange
         var currentDir = Directory.GetCurrentDirectory();
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        var errorOut = new StringWriter();
+        var testConsole = new TestConsole();
         new DirectoryInfo(Path.Combine(currentDir, "TestAssets", "EmptyProject")).CopyTo(tempDir);
 
-        var rootCommand = Program.BuildRootCommand(CreateClient());
+        var parser = Program.BuildParser(CreateClient());
 
         // Act
-        var result = rootCommand.Parse($"add-file -p {tempDir} -s Server --access Internal -i ImportDir {Path.Combine("Proto", "*.proto")}");
-        var errorCode = await result.InvokeAsync(configuration: new InvocationConfiguration { Error = errorOut });
+        var result = await parser.InvokeAsync($"add-file -p {tempDir} -s Server --access Internal -i ImportDir {Path.Combine("Proto", "*.proto")}", testConsole);
 
         // Assert
-        Assert.AreEqual(0, errorCode, errorOut.ToString());
+        Assert.AreEqual(0, result, testConsole.Error.ToString()!);
 
         var project = ProjectCollection.GlobalProjectCollection.LoadedProjects.Single(p => p.DirectoryPath == tempDir);
         project.ReevaluateIfNecessary();
@@ -81,7 +79,7 @@ public class AddFileCommandTests : TestBase
 
         // Act
         Directory.SetCurrentDirectory(tempDir);
-        var command = new AddFileCommand(ConsoleService.Null, projectPath: null, CreateClient());
+        var command = new AddFileCommand(new TestConsole(), projectPath: null, CreateClient());
         await command.AddFileAsync(Services.Server, Access.Internal, "ImportDir", new[] { Path.Combine("Proto", "*.proto") });
         command.Project.ReevaluateIfNecessary();
 
@@ -89,6 +87,7 @@ public class AddFileCommandTests : TestBase
         var packageRefs = command.Project.GetItems(CommandBase.PackageReferenceElement);
         Assert.AreEqual(1, packageRefs.Count);
         Assert.NotNull(packageRefs.SingleOrDefault(r => r.UnevaluatedInclude == "Grpc.AspNetCore" && !r.HasMetadata(CommandBase.PrivateAssetsElement)));
+
 
         var protoRefs = command.Project.GetItems(CommandBase.ProtobufElement);
         Assert.AreEqual(2, protoRefs.Count);

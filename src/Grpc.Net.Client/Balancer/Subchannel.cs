@@ -237,7 +237,6 @@ public sealed class Subchannel : IDisposable
     /// </summary>
     public void RequestConnection()
     {
-        var connectionRequested = false;
         lock (Lock)
         {
             switch (_state)
@@ -246,8 +245,7 @@ public sealed class Subchannel : IDisposable
                     SubchannelLog.ConnectionRequested(_logger, Id);
 
                     // Only start connecting underlying transport if in an idle state.
-                    // Update connectivity state outside of subchannel lock to avoid deadlock.
-                    connectionRequested = true;
+                    UpdateConnectivityState(ConnectivityState.Connecting, "Connection requested.");
                     break;
                 case ConnectivityState.Connecting:
                 case ConnectivityState.Ready:
@@ -265,11 +263,6 @@ public sealed class Subchannel : IDisposable
                     throw new ArgumentOutOfRangeException("state", _state, "Unexpected state.");
             }
         }
-
-        Debug.Assert(connectionRequested, "Ensure that only expected state made it to this point.");
-
-        SubchannelLog.StartingConnectionRequest(_logger, Id);
-        UpdateConnectivityState(ConnectivityState.Connecting, "Connection requested.");
 
         // Don't capture the current ExecutionContext and its AsyncLocals onto the connect
         var restoreFlow = false;
@@ -324,15 +317,6 @@ public sealed class Subchannel : IDisposable
             // Don't start connecting if the subchannel has been shutdown. Transport/semaphore will be disposed if shutdown.
             if (_state == ConnectivityState.Shutdown)
             {
-                return;
-            }
-
-            // There is already a connect in-progress on this transport.
-            // Don't cancel and start again as that causes queued requests waiting on the connect to fail.
-            if (_connectContext != null && !_connectContext.Disposed)
-            {
-                SubchannelLog.ConnectionRequestedInNonIdleState(_logger, Id, _state);
-                _delayInterruptTcs?.TrySetResult(null);
                 return;
             }
 
@@ -464,8 +448,6 @@ public sealed class Subchannel : IDisposable
 
     internal bool UpdateConnectivityState(ConnectivityState state, Status status)
     {
-        Debug.Assert(!Monitor.IsEntered(Lock), "Ensure the subchannel lock isn't held here. Updating channel state with the subchannel lock can cause a deadlock.");
-
         lock (Lock)
         {
             // Don't update subchannel state if the state is the same or the subchannel has been shutdown.
@@ -480,7 +462,7 @@ public sealed class Subchannel : IDisposable
             }
             _state = state;
         }
-
+        
         // Notify channel outside of lock to avoid deadlocks.
         _manager.OnSubchannelStateChange(this, state, status);
         return true;
@@ -642,11 +624,7 @@ internal static partial class SubchannelLog
             AddressesUpdated(logger, subchannelId, addressesText);
         }
     }
-
     [LoggerMessage(Level = LogLevel.Debug, EventId = 20, EventName = "QueuingConnect", Message = "Subchannel id '{SubchannelId}' queuing connect because a connect is already in progress.")]
     public static partial void QueuingConnect(ILogger logger, string subchannelId);
-
-    [LoggerMessage(Level = LogLevel.Trace, EventId = 21, EventName = "StartingConnectionRequest", Message = "Subchannel id '{SubchannelId}' starting connection request.")]
-    public static partial void StartingConnectionRequest(ILogger logger, string subchannelId);
 }
 #endif

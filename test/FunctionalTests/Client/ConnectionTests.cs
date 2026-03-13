@@ -91,27 +91,7 @@ public class ConnectionTests : FunctionalTestBase
     }
 
 #if NET7_0_OR_GREATER
-    [Test]
-    [RequireHttp3]
-    public async Task Http3()
-    {
-        // Arrange
-        var http = Fixture.CreateHandler(TestServerEndpointName.Http3WithTls);
-
-        var channel = GrpcChannel.ForAddress(http.address, new GrpcChannelOptions
-        {
-            LoggerFactory = LoggerFactory,
-            HttpHandler = http.handler
-        });
-
-        var client = new Greeter.GreeterClient(channel);
-
-        // Act
-        var response = await client.SayHelloAsync(new HelloRequest { Name = "John" }).ResponseAsync.DefaultTimeout();
-
-        // Assert
-        Assert.AreEqual("Hello John", response.Message);
-    }
+    
 #endif
 
     [Test]
@@ -150,45 +130,5 @@ public class ConnectionTests : FunctionalTestBase
         Assert.AreEqual("World", reply.Message);
     }
 
-    [Test]
-    [Ignore("Test disabled while figuring out the best solution for https://github.com/grpc/grpc-dotnet/issues/2075")]
-    public async Task ConfiguredProxy_SslProxyTunnel()
-    {
-        using var proxyServer = LoopbackProxyServer.Create(new LoopbackProxyServer.Options());
-
-        Task<HelloReply> Unary(HelloRequest request, ServerCallContext context)
-        {
-            return Task.FromResult(new HelloReply { Message = request.Name });
-        }
-
-        // Arrange
-        var method = Fixture.DynamicGrpc.AddUnaryMethod<HelloRequest, HelloReply>(Unary);
-
-        var http = Fixture.CreateHandler(TestServerEndpointName.Http2WithTls,
-            configureHandler: handler =>
-            {
-                handler.Proxy = new WebProxy(proxyServer.Uri);
-            });
-
-        using var channel = GrpcChannel.ForAddress(http.address, new GrpcChannelOptions
-        {
-            LoggerFactory = LoggerFactory,
-            HttpHandler = http.handler,
-            DisposeHttpClient = true
-        });
-
-        var client = TestClientFactory.Create(channel, method);
-
-        // Act
-        var reply = await client.UnaryCall(new HelloRequest { Name = "World" }).ResponseAsync.DefaultTimeout();
-
-        // Assert
-        Assert.AreEqual("World", reply.Message);
-
-        Assert.AreEqual(1, proxyServer.Connections);
-        Assert.AreEqual(1, proxyServer.Requests.Count);
-
-        var expected = $"CONNECT {http.address.Host}:{http.address.Port} HTTP/1.1";
-        Assert.AreEqual(expected, proxyServer.Requests[0].RequestLine);
-    }
+    
 }

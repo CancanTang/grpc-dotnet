@@ -1,4 +1,4 @@
-#region Copyright notice and license
+﻿#region Copyright notice and license
 
 // Copyright 2019 The gRPC Authors
 //
@@ -25,11 +25,11 @@ namespace Grpc.Dotnet.Cli.Commands;
 
 internal sealed class AddUrlCommand : CommandBase
 {
-    public AddUrlCommand(ConsoleService console, string? projectPath, HttpClient httpClient)
+    public AddUrlCommand(IConsole console, string? projectPath, HttpClient httpClient)
         : base(console, projectPath, httpClient) { }
 
     // Internal for testing
-    internal AddUrlCommand(ConsoleService console, HttpClient client)
+    internal AddUrlCommand(IConsole console, HttpClient client)
         : base(console, client) { }
 
     public static Command Create(HttpClient httpClient)
@@ -42,34 +42,33 @@ internal sealed class AddUrlCommand : CommandBase
         var serviceOption = CommonOptions.ServiceOption();
         var additionalImportDirsOption = CommonOptions.AdditionalImportDirsOption();
         var accessOption = CommonOptions.AccessOption();
-        var outputOption = new Option<string>("--output", ["-o"])
+        var outputOption = new Option<string>(
+            aliases: new[] { "-o", "--output" },
+            description: CoreStrings.OutputOptionDescription);
+        var urlArgument = new Argument<string>
         {
-            Description = CoreStrings.OutputOptionDescription
-        };
-        var urlArgument = new Argument<string>("url")
-        {
+            Name = "url",
             Description = CoreStrings.AddUrlCommandArgumentDescription,
             Arity = ArgumentArity.ExactlyOne
         };
 
-        command.Add(outputOption);
-        command.Add(projectOption);
-        command.Add(serviceOption);
-        command.Add(additionalImportDirsOption);
-        command.Add(accessOption);
-        command.Add(urlArgument);
+        command.AddOption(outputOption);
+        command.AddOption(projectOption);
+        command.AddOption(serviceOption);
+        command.AddOption(additionalImportDirsOption);
+        command.AddOption(accessOption);
+        command.AddArgument(urlArgument);
 
-        command.SetAction(
+        command.SetHandler(
             async (context) =>
             {
-                var project = context.GetValue(projectOption);
-                var services = context.GetValue(serviceOption);
-                var access = context.GetValue(accessOption);
-                var additionalImportDirs = context.GetValue(additionalImportDirsOption);
-                var output = context.GetValue(outputOption);
-                var url = context.GetRequiredValue(urlArgument);
+                var project = context.ParseResult.GetValueForOption(projectOption);
+                var services = context.ParseResult.GetValueForOption(serviceOption);
+                var access = context.ParseResult.GetValueForOption(accessOption);
+                var additionalImportDirs = context.ParseResult.GetValueForOption(additionalImportDirsOption);
+                var output = context.ParseResult.GetValueForOption(outputOption);
+                var url = context.ParseResult.GetValueForArgument(urlArgument);
 
-                var console = new ConsoleService(context.InvocationConfiguration.Output, context.InvocationConfiguration.Error);
                 try
                 {
                     if (string.IsNullOrEmpty(output))
@@ -77,16 +76,16 @@ internal sealed class AddUrlCommand : CommandBase
                         throw new CLIToolException(CoreStrings.ErrorNoOutputProvided);
                     }
 
-                    var command = new AddUrlCommand(console, project, httpClient);
+                    var command = new AddUrlCommand(context.Console, project, httpClient);
                     await command.AddUrlAsync(services, access, additionalImportDirs, url, output);
 
-                    return 0;
+                    context.ExitCode = 0;
                 }
                 catch (CLIToolException e)
                 {
-                    console.LogError(e);
+                    context.Console.LogError(e);
 
-                    return -1;
+                    context.ExitCode = -1;
                 }
             });
 

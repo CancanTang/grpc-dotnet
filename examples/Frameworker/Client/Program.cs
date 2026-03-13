@@ -22,7 +22,10 @@ using Grpc.Net.Client;
 
 Console.WriteLine("Target framework name: " + AppDomain.CurrentDomain.SetupInformation.TargetFrameworkName);
 
-using var channel = GrpcChannel.ForAddress("https://localhost:5001");
+using var channel = GrpcChannel.ForAddress("https://localhost:5001", new GrpcChannelOptions
+{
+    HttpHandler = new WinHttpHandler()
+});
 var client = new Greeter.GreeterClient(channel);
 
 var reply = await client.SayHelloAsync(new HelloRequest { Name = "GreeterClient" });

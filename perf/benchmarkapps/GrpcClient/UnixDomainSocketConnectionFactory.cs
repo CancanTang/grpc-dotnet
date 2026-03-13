@@ -21,8 +21,6 @@ using System.Net.Sockets;
 
 namespace GrpcClient;
 
-#if NET9_0_OR_GREATER
-
 public class UnixDomainSocketConnectionFactory
 {
     private readonly EndPoint _endPoint;
@@ -48,5 +46,3 @@ public class UnixDomainSocketConnectionFactory
         }
     }
 }
-
-#endif

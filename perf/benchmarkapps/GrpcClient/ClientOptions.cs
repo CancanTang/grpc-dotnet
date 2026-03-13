@@ -39,5 +39,4 @@ public class ClientOptions
     public GrpcClientType GrpcClientType { get; set; }
     public int Streams { get; set; }
     public int Deadline { get; set; }
-    public bool WinHttpHandler { get; set; }
 }

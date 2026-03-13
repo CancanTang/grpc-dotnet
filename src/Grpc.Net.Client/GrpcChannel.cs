@@ -16,6 +16,7 @@
 
 #endregion
 
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Grpc.Core;
 #if SUPPORT_LOAD_BALANCING
@@ -50,7 +51,7 @@ public sealed partial class GrpcChannel : ChannelBase, IDisposable
     internal const long DefaultMaxRetryBufferPerCallSize = 1024 * 1024; // 1 MB
 
     private readonly object _lock;
-    private readonly ThreadSafeLookup<IMethod, GrpcMethodInfo> _methodInfoCache;
+    private readonly ConcurrentDictionary<IMethod, GrpcMethodInfo> _methodInfoCache;
     private readonly Func<IMethod, GrpcMethodInfo> _createMethodInfoFunc;
     private readonly Dictionary<MethodKey, MethodConfig>? _serviceConfigMethods;
     private readonly bool _isSecure;
@@ -108,7 +109,7 @@ public sealed partial class GrpcChannel : ChannelBase, IDisposable
     internal GrpcChannel(Uri address, GrpcChannelOptions channelOptions) : base(address.Authority)
     {
         _lock = new object();
-        _methodInfoCache = new ThreadSafeLookup<IMethod, GrpcMethodInfo>();
+        _methodInfoCache = new ConcurrentDictionary<IMethod, GrpcMethodInfo>();
 
         // Dispose the HTTP client/handler if...
         //   1. No client/handler was specified and so the channel created the client itself

@@ -35,7 +35,6 @@ internal sealed partial class ServerCallHandlerFactory<[DynamicallyAccessedMembe
 {
     private readonly ILoggerFactory _loggerFactory;
     private readonly IGrpcServiceActivator<TService> _serviceActivator;
-    private readonly InterceptorActivators _interceptorActivators;
     private readonly GrpcServiceOptions _globalOptions;
     private readonly GrpcServiceOptions<TService> _serviceOptions;
 
@@ -43,12 +42,10 @@ internal sealed partial class ServerCallHandlerFactory<[DynamicallyAccessedMembe
         ILoggerFactory loggerFactory,
         IOptions<GrpcServiceOptions> globalOptions,
         IOptions<GrpcServiceOptions<TService>> serviceOptions,
-        IGrpcServiceActivator<TService> serviceActivator,
-        InterceptorActivators interceptorActivators)
+        IGrpcServiceActivator<TService> serviceActivator)
     {
         _loggerFactory = loggerFactory;
         _serviceActivator = serviceActivator;
-        _interceptorActivators = interceptorActivators;
         _serviceOptions = serviceOptions.Value;
         _globalOptions = globalOptions.Value;
     }
@@ -64,7 +61,7 @@ internal sealed partial class ServerCallHandlerFactory<[DynamicallyAccessedMembe
         where TResponse : class
     {
         var options = CreateMethodOptions();
-        var methodInvoker = new UnaryServerMethodInvoker<TService, TRequest, TResponse>(invoker, method, options, _serviceActivator, _interceptorActivators);
+        var methodInvoker = new UnaryServerMethodInvoker<TService, TRequest, TResponse>(invoker, method, options, _serviceActivator);
 
         return new UnaryServerCallHandler<TService, TRequest, TResponse>(methodInvoker, _loggerFactory);
     }
@@ -74,7 +71,7 @@ internal sealed partial class ServerCallHandlerFactory<[DynamicallyAccessedMembe
         where TResponse : class
     {
         var options = CreateMethodOptions();
-        var methodInvoker = new ClientStreamingServerMethodInvoker<TService, TRequest, TResponse>(invoker, method, options, _serviceActivator, _interceptorActivators);
+        var methodInvoker = new ClientStreamingServerMethodInvoker<TService, TRequest, TResponse>(invoker, method, options, _serviceActivator);
 
         return new ClientStreamingServerCallHandler<TService, TRequest, TResponse>(methodInvoker, _loggerFactory);
     }
@@ -84,7 +81,7 @@ internal sealed partial class ServerCallHandlerFactory<[DynamicallyAccessedMembe
         where TResponse : class
     {
         var options = CreateMethodOptions();
-        var methodInvoker = new DuplexStreamingServerMethodInvoker<TService, TRequest, TResponse>(invoker, method, options, _serviceActivator, _interceptorActivators);
+        var methodInvoker = new DuplexStreamingServerMethodInvoker<TService, TRequest, TResponse>(invoker, method, options, _serviceActivator);
 
         return new DuplexStreamingServerCallHandler<TService, TRequest, TResponse>(methodInvoker, _loggerFactory);
     }
@@ -94,7 +91,7 @@ internal sealed partial class ServerCallHandlerFactory<[DynamicallyAccessedMembe
         where TResponse : class
     {
         var options = CreateMethodOptions();
-        var methodInvoker = new ServerStreamingServerMethodInvoker<TService, TRequest, TResponse>(invoker, method, options, _serviceActivator, _interceptorActivators);
+        var methodInvoker = new ServerStreamingServerMethodInvoker<TService, TRequest, TResponse>(invoker, method, options, _serviceActivator);
 
         return new ServerStreamingServerCallHandler<TService, TRequest, TResponse>(methodInvoker, _loggerFactory);
     }

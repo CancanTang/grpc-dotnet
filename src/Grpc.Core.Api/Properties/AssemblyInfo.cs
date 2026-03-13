@@ -16,6 +16,7 @@
 
 #endregion
 
+using System.Reflection;
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("Grpc.Core,PublicKey=" +

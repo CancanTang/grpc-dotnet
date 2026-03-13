@@ -1,4 +1,4 @@
-#region Copyright notice and license
+﻿#region Copyright notice and license
 
 // Copyright 2019 The gRPC Authors
 //
@@ -18,6 +18,7 @@
 
 using System.IO.Compression;
 using Grpc.AspNetCore.Server;
+using Grpc.AspNetCore.Server.Internal;
 using Grpc.Net.Compression;
 
 namespace Grpc.Shared.Server;
@@ -27,11 +28,6 @@ namespace Grpc.Shared.Server;
 /// </summary>
 internal sealed class MethodOptions
 {
-    // Default to no send limit and 4mb receive limit.
-    // Matches the gRPC C impl defaults
-    // https://github.com/grpc/grpc/blob/977df7208a6e3f9a62a6369af5cd6e4b69b4fdec/include/grpc/impl/codegen/grpc_types.h#L413-L416
-    internal const int DefaultReceiveMaxMessageSize = 4 * 1024 * 1024;
-
     /// <summary>
     /// Gets the list of compression providers used to compress and decompress gRPC messages.
     /// </summary>
@@ -74,8 +70,6 @@ internal sealed class MethodOptions
     // Fast check for whether the service has any interceptors
     internal bool HasInterceptors { get; }
 
-    internal bool SuppressCreatingService { get; }
-
     private MethodOptions(
         Dictionary<string, ICompressionProvider> compressionProviders,
         InterceptorCollection interceptors,
@@ -83,8 +77,7 @@ internal sealed class MethodOptions
         int? maxReceiveMessageSize,
         bool? enableDetailedErrors,
         string? responseCompressionAlgorithm,
-        CompressionLevel? responseCompressionLevel,
-        bool suppressCreatingService)
+        CompressionLevel? responseCompressionLevel)
     {
         CompressionProviders = compressionProviders;
         Interceptors = interceptors;
@@ -94,7 +87,6 @@ internal sealed class MethodOptions
         EnableDetailedErrors = enableDetailedErrors;
         ResponseCompressionAlgorithm = responseCompressionAlgorithm;
         ResponseCompressionLevel = responseCompressionLevel;
-        SuppressCreatingService = suppressCreatingService;
 
         if (ResponseCompressionAlgorithm != null)
         {
@@ -120,23 +112,22 @@ internal sealed class MethodOptions
         var tempInterceptors = new List<InterceptorRegistration>();
         int? maxSendMessageSize = null;
         var maxSendMessageSizeConfigured = false;
-        int? maxReceiveMessageSize = DefaultReceiveMaxMessageSize;
+        int? maxReceiveMessageSize = GrpcServiceOptionsSetup.DefaultReceiveMaxMessageSize;
         var maxReceiveMessageSizeConfigured = false;
         bool? enableDetailedErrors = null;
         string? responseCompressionAlgorithm = null;
         CompressionLevel? responseCompressionLevel = null;
-        bool? suppressCreatingService = null;
 
         foreach (var options in serviceOptions.Reverse())
         {
             AddCompressionProviders(resolvedCompressionProviders, options.CompressionProviders);
             tempInterceptors.InsertRange(0, options.Interceptors);
-            if (!maxSendMessageSizeConfigured && options.MaxSendMessageSizeSpecified)
+            if (!maxSendMessageSizeConfigured && options._maxSendMessageSizeConfigured)
             {
                 maxSendMessageSize = options.MaxSendMessageSize;
                 maxSendMessageSizeConfigured = true;
             }
-            if (!maxReceiveMessageSizeConfigured && options.MaxReceiveMessageSizeSpecified)
+            if (!maxReceiveMessageSizeConfigured && options._maxReceiveMessageSizeConfigured)
             {
                 maxReceiveMessageSize = options.MaxReceiveMessageSize;
                 maxReceiveMessageSizeConfigured = true;
@@ -144,7 +135,6 @@ internal sealed class MethodOptions
             enableDetailedErrors ??= options.EnableDetailedErrors;
             responseCompressionAlgorithm ??= options.ResponseCompressionAlgorithm;
             responseCompressionLevel ??= options.ResponseCompressionLevel;
-            suppressCreatingService ??= options.SuppressCreatingService;
         }
 
         var interceptors = new InterceptorCollection();
@@ -158,8 +148,7 @@ internal sealed class MethodOptions
             maxReceiveMessageSize: maxReceiveMessageSize,
             enableDetailedErrors: enableDetailedErrors,
             responseCompressionAlgorithm: responseCompressionAlgorithm,
-            responseCompressionLevel: responseCompressionLevel,
-            suppressCreatingService: suppressCreatingService ?? false
+            responseCompressionLevel: responseCompressionLevel
         );
     }
 

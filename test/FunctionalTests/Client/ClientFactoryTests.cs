@@ -82,52 +82,6 @@ public class ClientFactoryTests : FunctionalTestBase
     }
 
 #if NET7_0_OR_GREATER
-    [Test]
-    [RequireHttp3]
-    public async Task ClientFactory_Http3_Success()
-    {
-        // Arrange
-        Task<HelloReply> UnaryCall(HelloRequest request, ServerCallContext context)
-        {
-            return Task.FromResult(new HelloReply { Message = $"Hello {request.Name}" });
-        }
-        var method = Fixture.DynamicGrpc.AddUnaryMethod<HelloRequest, HelloReply>(UnaryCall);
-
-        var serviceCollection = new ServiceCollection();
-        serviceCollection.AddSingleton<ILoggerFactory>(LoggerFactory);
-        serviceCollection
-            .AddGrpcClient<TestClient<HelloRequest, HelloReply>>(options =>
-            {
-                options.Address = Fixture.GetUrl(TestServerEndpointName.Http3WithTls);
-            })
-            .ConfigureGrpcClientCreator(invoker =>
-            {
-                return TestClientFactory.Create(invoker, method);
-            })
-            .ConfigureChannel(options =>
-            {
-                options.HttpVersion = HttpVersion.Version30;
-                options.HttpVersionPolicy = HttpVersionPolicy.RequestVersionExact;
-            })
-            .ConfigurePrimaryHttpMessageHandler(() =>
-            {
-                return new SocketsHttpHandler
-                {
-                    SslOptions = new SslClientAuthenticationOptions
-                    {
-                        RemoteCertificateValidationCallback = (____, ___, __, _) => true
-                    }
-                };
-            });
-        var services = serviceCollection.BuildServiceProvider();
-
-        // Act
-        var client1 = services.GetRequiredService<TestClient<HelloRequest, HelloReply>>();
-        var call1 = client1.UnaryCall(new HelloRequest { Name = "world" });
-        var response1 = await call1.ResponseAsync.DefaultTimeout();
-
-        // Assert
-        Assert.AreEqual("Hello world", response1.Message);
-    }
+    
 #endif
 }

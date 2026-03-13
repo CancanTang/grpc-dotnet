@@ -1,4 +1,4 @@
-#region Copyright notice and license
+﻿#region Copyright notice and license
 
 // Copyright 2019 The gRPC Authors
 //
@@ -16,10 +16,9 @@
 
 #endregion
 
-using System.Buffers;
 using System.Buffers.Binary;
+using System.Data;
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Net.Http.Headers;
 using System.Text;
 
@@ -36,18 +35,16 @@ internal sealed class GrpcWebResponseStream : Stream
 
     private readonly Stream _inner;
     private readonly HttpHeaders _responseTrailers;
-    private readonly HttpResponseMessage _response;
     private byte[]? _headerBuffer;
 
     // Internal for testing
     internal ResponseState _state;
     internal int _contentRemaining;
 
-    public GrpcWebResponseStream(Stream inner, HttpHeaders responseTrailers, HttpResponseMessage response)
+    public GrpcWebResponseStream(Stream inner, HttpHeaders responseTrailers)
     {
         _inner = inner;
         _responseTrailers = responseTrailers;
-        _response = response;
     }
 
 #if NETSTANDARD2_0
@@ -94,8 +91,8 @@ internal sealed class GrpcWebResponseStream : Stream
                     // On first read of header data, check first byte to see if this is a trailer.
                     if (_contentRemaining == HeaderLength)
                     {
-                        var compressionByte = headerBuffer.Span[0];
-                        var isTrailer = IsBitSet(compressionByte, pos: 7);
+                        var compressed = headerBuffer.Span[0];
+                        var isTrailer = IsBitSet(compressed, pos: 7);
                         if (isTrailer)
                         {
                             _state = ResponseState.Trailer;
@@ -161,10 +158,9 @@ internal sealed class GrpcWebResponseStream : Stream
                         }
                         headerBuffer = newBuffer;
                     }
-                    var isCompressed = IsBitSet(headerBuffer.Span[0], pos: 0);
                     var length = (int)BinaryPrimitives.ReadUInt32BigEndian(headerBuffer.Span.Slice(1));
 
-                    await ReadTrailersAsync(isCompressed, length, data, cancellationToken).ConfigureAwait(false);
+                    await ReadTrailersAsync(length, data, cancellationToken).ConfigureAwait(false);
                     return 0;
                 }
             default:
@@ -172,7 +168,7 @@ internal sealed class GrpcWebResponseStream : Stream
         }
     }
 
-    private async Task ReadTrailersAsync(bool isCompressed, int trailerLength, Memory<byte> data, CancellationToken cancellationToken)
+    private async Task ReadTrailersAsync(int trailerLength, Memory<byte> data, CancellationToken cancellationToken)
     {
         if (trailerLength > 0)
         {
@@ -191,17 +187,6 @@ internal sealed class GrpcWebResponseStream : Stream
             if (!success)
             {
                 throw new InvalidOperationException("Could not read trailing headers.");
-            }
-
-            if (isCompressed)
-            {
-                var encoding = CompressionHelpers.GetGrpcEncoding(_response);
-                if (!CompressionHelpers.TryDecompressMessage(encoding, CompressionHelpers.CompressionHandlers, data, trailerLength, out var result))
-                {
-                    throw new InvalidOperationException($"Could not decompress trailing headers with encoding '{encoding}'.");
-                }
-
-                data = result.ToArray();
             }
 
             ParseTrailers(data.Span);

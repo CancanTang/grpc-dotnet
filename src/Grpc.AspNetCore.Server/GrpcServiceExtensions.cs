@@ -22,7 +22,6 @@ using Grpc.AspNetCore.Server.Internal;
 using Grpc.AspNetCore.Server.Model;
 using Grpc.AspNetCore.Server.Model.Internal;
 using Grpc.Shared;
-using Grpc.Shared.Server;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -70,7 +69,6 @@ public static class GrpcServicesExtensions
         services.AddOptions();
         services.TryAddSingleton<GrpcMarkerService>();
         services.TryAddSingleton(typeof(ServerCallHandlerFactory<>));
-        services.TryAddSingleton<InterceptorActivators>();
         services.TryAddSingleton(typeof(IGrpcServiceActivator<>), typeof(DefaultGrpcServiceActivator<>));
         services.TryAddSingleton(typeof(IGrpcInterceptorActivator<>), typeof(DefaultGrpcInterceptorActivator<>));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<GrpcServiceOptions>, GrpcServiceOptionsSetup>());
@@ -79,12 +77,8 @@ public static class GrpcServicesExtensions
         services.TryAddSingleton<ServiceMethodsRegistry>();
         services.TryAddSingleton(typeof(ServiceRouteBuilder<>));
         services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IServiceMethodProvider<>), typeof(BinderServiceMethodProvider<>)));
-        services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IServiceMethodProvider<>), typeof(ServiceDefinitionMethodProvider<>)));
 
-        var builder = new GrpcServerBuilder(services);
-        builder.AddServiceOptions<ServerServiceDefinitionMarker>(options => options.SuppressCreatingService = true);
-
-        return builder;
+        return new GrpcServerBuilder(services);
 
         static void ConfigureRouting(RouteOptions options)
         {

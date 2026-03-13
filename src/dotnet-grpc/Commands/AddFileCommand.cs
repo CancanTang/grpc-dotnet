@@ -1,4 +1,4 @@
-#region Copyright notice and license
+﻿#region Copyright notice and license
 
 // Copyright 2019 The gRPC Authors
 //
@@ -25,7 +25,7 @@ namespace Grpc.Dotnet.Cli.Commands;
 
 internal sealed class AddFileCommand : CommandBase
 {
-    public AddFileCommand(ConsoleService console, string? projectPath, HttpClient httpClient)
+    public AddFileCommand(IConsole console, string? projectPath, HttpClient httpClient)
         : base(console, projectPath, httpClient) { }
 
     public static Command Create(HttpClient httpClient)
@@ -38,40 +38,40 @@ internal sealed class AddFileCommand : CommandBase
         var serviceOption = CommonOptions.ServiceOption();
         var additionalImportDirsOption = CommonOptions.AdditionalImportDirsOption();
         var accessOption = CommonOptions.AccessOption();
-        var filesArgument = new Argument<string[]>("files")
+        var filesArgument = new Argument<string[]>
         {
+            Name = "files",
             Description = CoreStrings.AddFileCommandArgumentDescription,
             Arity = ArgumentArity.OneOrMore
         };
 
-        command.Add(projectOption);
-        command.Add(serviceOption);
-        command.Add(accessOption);
-        command.Add(additionalImportDirsOption);
-        command.Add(filesArgument);
+        command.AddOption(projectOption);
+        command.AddOption(serviceOption);
+        command.AddOption(accessOption);
+        command.AddOption(additionalImportDirsOption);
+        command.AddArgument(filesArgument);
 
-        command.SetAction(
+        command.SetHandler(
             async (context) =>
             {
-                var project = context.GetValue(projectOption);
-                var services = context.GetValue(serviceOption);
-                var access = context.GetValue(accessOption);
-                var additionalImportDirs = context.GetValue(additionalImportDirsOption);
-                var files = context.GetValue(filesArgument) ?? [];
+                var project = context.ParseResult.GetValueForOption(projectOption);
+                var services = context.ParseResult.GetValueForOption(serviceOption);
+                var access = context.ParseResult.GetValueForOption(accessOption);
+                var additionalImportDirs = context.ParseResult.GetValueForOption(additionalImportDirsOption);
+                var files = context.ParseResult.GetValueForArgument(filesArgument);
 
-                var console = new ConsoleService(context.InvocationConfiguration.Output, context.InvocationConfiguration.Error);
                 try
                 {
-                    var command = new AddFileCommand(console, project, httpClient);
+                    var command = new AddFileCommand(context.Console, project, httpClient);
                     await command.AddFileAsync(services, access, additionalImportDirs, files);
 
-                    return 0;
+                    context.ExitCode = 0;
                 }
                 catch (CLIToolException e)
                 {
-                    console.LogError(e);
+                    context.Console.LogError(e);
 
-                    return -1;
+                    context.ExitCode = -1;
                 }
             });
 

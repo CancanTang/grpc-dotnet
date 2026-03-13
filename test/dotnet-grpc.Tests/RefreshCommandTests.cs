@@ -16,11 +16,10 @@
 
 #endregion
 
-using System.CommandLine;
+using System.CommandLine.IO;
 using System.CommandLine.Parsing;
 using System.Globalization;
 using Grpc.Dotnet.Cli.Commands;
-using Grpc.Dotnet.Cli.Internal;
 using Grpc.Dotnet.Cli.Properties;
 using Microsoft.Build.Evaluation;
 using NUnit.Framework;
@@ -38,23 +37,21 @@ public class RefreshCommandTests : TestBase
         // Arrange
         var currentDir = Directory.GetCurrentDirectory();
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        var outWriter = new StringWriter();
-        var errorWriter = new StringWriter();
+        var testConsole = new TestConsole();
         new DirectoryInfo(Path.Combine(currentDir, "TestAssets", "ProjectWithReference")).CopyTo(tempDir);
 
-        var rootCommand = Program.BuildRootCommand(CreateClient());
+        var parser = Program.BuildParser(CreateClient());
 
         // Act
-        var result = rootCommand.Parse($"refresh -p {tempDir} --dry-run {dryRun}");
-        var errorCode = await result.InvokeAsync(configuration: new InvocationConfiguration { Output = outWriter, Error = errorWriter });
+        var result = await parser.InvokeAsync($"refresh -p {tempDir} --dry-run {dryRun}", testConsole);
 
         // Assert
-        Assert.AreEqual(0, errorCode, errorWriter.ToString());
+        Assert.AreEqual(0, result, testConsole.Error.ToString()!);
 
         var project = ProjectCollection.GlobalProjectCollection.LoadedProjects.Single(p => p.DirectoryPath == tempDir);
         project.ReevaluateIfNecessary();
 
-        Assert.AreEqual(string.Format(CultureInfo.InvariantCulture, CoreStrings.LogDownload, "Proto/a.proto", SourceUrl), outWriter.ToString().TrimEnd());
+        Assert.AreEqual(string.Format(CultureInfo.InvariantCulture, CoreStrings.LogDownload, "Proto/a.proto", SourceUrl), testConsole.Out.ToString()!.TrimEnd());
         Assert.AreEqual(dryRun, string.IsNullOrEmpty(File.ReadAllText(Path.Combine(project.DirectoryPath, "Proto", "a.proto"))));
 
         // Cleanup
@@ -69,16 +66,16 @@ public class RefreshCommandTests : TestBase
         // Arrange
         var currentDir = Directory.GetCurrentDirectory();
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        var outWriter = new StringWriter();
+        var testConsole = new TestConsole();
         new DirectoryInfo(Path.Combine(currentDir, "TestAssets", "ProjectWithReference")).CopyTo(tempDir);
 
         // Act
         Directory.SetCurrentDirectory(tempDir);
-        var command = new RefreshCommand(new ConsoleService(outWriter, TextWriter.Null), CreateClient());
+        var command = new RefreshCommand(testConsole, CreateClient());
         await command.RefreshAsync(dryRun, Array.Empty<string>());
 
         // Assert
-        Assert.AreEqual(string.Format(CultureInfo.InvariantCulture, CoreStrings.LogDownload, "Proto/a.proto", SourceUrl), outWriter.ToString().TrimEnd());
+        Assert.AreEqual(string.Format(CultureInfo.InvariantCulture, CoreStrings.LogDownload, "Proto/a.proto", SourceUrl), testConsole.Out.ToString()!.TrimEnd());
         Assert.AreEqual(dryRun, string.IsNullOrEmpty(File.ReadAllText(Path.Combine(command.Project.DirectoryPath, "Proto", "a.proto"))));
 
         // Cleanup

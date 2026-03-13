@@ -16,10 +16,9 @@
 
 #endregion
 
-using System.CommandLine;
+using System.CommandLine.IO;
 using System.CommandLine.Parsing;
 using Grpc.Dotnet.Cli.Commands;
-using Grpc.Dotnet.Cli.Internal;
 using Microsoft.Build.Evaluation;
 using NUnit.Framework;
 
@@ -35,17 +34,16 @@ public class RemoveCommandTests : TestBase
         // Arrange
         var currentDir = Directory.GetCurrentDirectory();
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        var errorWriter = new StringWriter();
+        var testConsole = new TestConsole();
         new DirectoryInfo(Path.Combine(currentDir, "TestAssets", "ProjectWithReference")).CopyTo(tempDir);
 
-        var rootCommand = Program.BuildRootCommand(CreateClient());
+        var parser = Program.BuildParser(CreateClient());
 
         // Act
-        var result = rootCommand.Parse($"remove -p {tempDir} {Path.Combine("Proto", "a.proto")}");
-        var errorCode = await result.InvokeAsync(configuration: new InvocationConfiguration { Error = errorWriter });
+        var result = await parser.InvokeAsync($"remove -p {tempDir} {Path.Combine("Proto", "a.proto")}", testConsole);
 
         // Assert
-        Assert.AreEqual(0, errorCode, errorWriter.ToString());
+        Assert.AreEqual(0, result, testConsole.Error.ToString()!);
 
         var project = ProjectCollection.GlobalProjectCollection.LoadedProjects.Single(p => p.DirectoryPath == tempDir);
         project.ReevaluateIfNecessary();
@@ -69,7 +67,7 @@ public class RemoveCommandTests : TestBase
 
         // Act
         Directory.SetCurrentDirectory(tempDir);
-        var command = new RemoveCommand(ConsoleService.Null, null, CreateClient());
+        var command = new RemoveCommand(new TestConsole(), null, CreateClient());
         command.Remove(new[] { Path.Combine("Proto", "a.proto") });
 
         // Assert

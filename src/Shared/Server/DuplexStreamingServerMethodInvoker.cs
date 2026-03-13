@@ -18,6 +18,7 @@
 
 using System.Diagnostics.CodeAnalysis;
 using Grpc.AspNetCore.Server;
+using Grpc.AspNetCore.Server.Internal;
 using Grpc.AspNetCore.Server.Model;
 using Grpc.Core;
 using Microsoft.AspNetCore.Http;
@@ -30,7 +31,7 @@ namespace Grpc.Shared.Server;
 /// <typeparam name="TService">Service type for this method.</typeparam>
 /// <typeparam name="TRequest">Request message type for this method.</typeparam>
 /// <typeparam name="TResponse">Response message type for this method.</typeparam>
-internal sealed class DuplexStreamingServerMethodInvoker<[DynamicallyAccessedMembers(ServerDynamicAccessConstants.ServiceAccessibility)] TService, TRequest, TResponse> : ServerMethodInvokerBase<TService, TRequest, TResponse>
+internal sealed class DuplexStreamingServerMethodInvoker<[DynamicallyAccessedMembers(GrpcProtocolConstants.ServiceAccessibility)] TService, TRequest, TResponse> : ServerMethodInvokerBase<TService, TRequest, TResponse>
     where TRequest : class
     where TResponse : class
     where TService : class
@@ -45,20 +46,18 @@ internal sealed class DuplexStreamingServerMethodInvoker<[DynamicallyAccessedMem
     /// <param name="method">The description of the gRPC method.</param>
     /// <param name="options">The options used to execute the method.</param>
     /// <param name="serviceActivator">The service activator used to create service instances.</param>
-    /// <param name="interceptorActivators">The interceptor activators used to create interceptor instances.</param>
     public DuplexStreamingServerMethodInvoker(
         DuplexStreamingServerMethod<TService, TRequest, TResponse> invoker,
         Method<TRequest, TResponse> method,
         MethodOptions options,
-        IGrpcServiceActivator<TService> serviceActivator,
-        InterceptorActivators interceptorActivators)
+        IGrpcServiceActivator<TService> serviceActivator)
         : base(method, options, serviceActivator)
     {
         _invoker = invoker;
 
         if (Options.HasInterceptors)
         {
-            var interceptorPipeline = new InterceptorPipelineBuilder<TRequest, TResponse>(Options.Interceptors, interceptorActivators);
+            var interceptorPipeline = new InterceptorPipelineBuilder<TRequest, TResponse>(Options.Interceptors);
             _pipelineInvoker = interceptorPipeline.DuplexStreamingPipeline(ResolvedInterceptorInvoker);
         }
     }
@@ -68,7 +67,7 @@ internal sealed class DuplexStreamingServerMethodInvoker<[DynamicallyAccessedMem
         GrpcActivatorHandle<TService> serviceHandle = default;
         try
         {
-            serviceHandle = CreateServiceHandle(resolvedContext);
+            serviceHandle = ServiceActivator.Create(resolvedContext.GetHttpContext().RequestServices);
             await _invoker(
                 serviceHandle.Instance,
                 requestStream,
@@ -99,7 +98,7 @@ internal sealed class DuplexStreamingServerMethodInvoker<[DynamicallyAccessedMem
             GrpcActivatorHandle<TService> serviceHandle = default;
             try
             {
-                serviceHandle = CreateServiceHandle(httpContext);
+                serviceHandle = ServiceActivator.Create(httpContext.RequestServices);
                 await _invoker(
                     serviceHandle.Instance,
                     requestStream,
